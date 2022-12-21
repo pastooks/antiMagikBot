@@ -39,14 +39,14 @@ async def on_message(message):
             if repliedTo.reference is not None:  # is a reply to the origin image
                 originID = repliedTo.reference.message_id
                 origin = await message.channel.fetch_message(originID)
-                if checkMap.keys.__contains__(origin.author.id):  # if source is on list
+                if origin.author.id in users:  # if source is on list
                     if origin.author.id != repliedTo.author.id:  # if source is not requester
                         for string in checkMap[origin.author.id]:
                             if string == "all":  # if universal blacklist
                                 await message.delete()
                                 await repliedTo.reply(':thumbsdown:')
                                 return
-                            if repliedTo.content.contains(string):  # if blacklist includes used command
+                            if string in repliedTo.content:  # if blacklist includes used command
                                 await message.delete()
                                 await repliedTo.reply(':thumbsdown:')
                                 return
@@ -56,27 +56,27 @@ async def on_message(message):
                         if len(checkMe.attachments) != 0:  # message has attachments
                             for i in checkMe.attachments:
                                 if i.content_type.startswith("image"):  # message has an image
-                                    if checkMap.keys.__contains__(checkMe.author.id):  # is from a blocked user
+                                    if checkMe.author.id in users:  # is from a blocked user
                                         for string in checkMap[checkMe.author.id]:
                                             if string == "all":  # if universal blacklist
                                                 await message.delete()
                                                 await repliedTo.reply(':thumbsdown:')
                                                 return
-                                            if repliedTo.content.contains(string):  # if blacklist includes used command
+                                            if string in repliedTo.content:  # if blacklist includes used command
                                                 await message.delete()
                                                 await repliedTo.reply(':thumbsdown:')
                                                 return
                                     return  # source is safe
                         if len(checkMe.embeds) != 0:  # message has embeds
                             for i in checkMe.embeds:
-                                if not embedList.__contains__(i.type):  # embed is 100% an image (rich moment, might get false positives)
-                                    if checkMap.keys.__contains__(checkMe.author.id):  # is from a blocked user
+                                if i.type not in embedList:  # embed is 100% an image (rich moment, might get false positives)
+                                    if checkMe.author.id in users:  # is from a blocked user
                                         for string in checkMap[checkMe.author.id]:
                                             if string == "all":  # if universal blacklist
                                                 await message.delete()
                                                 await repliedTo.reply(':thumbsdown:')
                                                 return
-                                            if repliedTo.content.contains(string):  # if blacklist includes used command
+                                            if string in repliedTo.content:  # if blacklist includes used command
                                                 await message.delete()
                                                 await repliedTo.reply(':thumbsdown:')
                                                 return
@@ -149,7 +149,7 @@ async def on_message(message):
             else:
                 tempList = checkMap[message.author.id]
                 if parsed[1] in tempList:
-                    tempList.discard(parsed[1])
+                    tempList.remove(parsed[1])
                     if len(tempList) == 0:
                         await message.reply("all blacklisted commands removed, universal blacklist applied. to instead have no blacklist, use `<removeme`")
                         checkMap[message.author.id] = ["all"]
