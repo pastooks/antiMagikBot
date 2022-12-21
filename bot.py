@@ -1,32 +1,34 @@
 # This example requires the 'message_content' intent.
+import json
 
 import discord
-import csv
 
 intents = discord.Intents.default()
 intents.message_content = True
 
-def writeList(fileName: str):
-    retList = []
-    fileOpened = open(fileName, newline='\n')
-    fileReader = csv.reader(fileOpened)
-    tempList = []
-    for row in fileReader:
-        tempList = row
-    for i in tempList:
-        retList.append(int(i))
-    print(retList)
-    return retList
-
 client = discord.Client(intents=intents)
-checkList = writeList('listStore.csv')
+
+def writeMap(fileName: str):
+    f = open(fileName)
+    tempMap = json.load(f)
+    retMap = {}
+    for i in tempMap.keys():
+        retMap[int(i)] = tempMap[i]
+    return retMap
+
+checkMap = writeMap('mapStore.json')  # if json lost replace with {}
 embedList = ["link", "article", "video"]
 @client.event
 async def on_ready():
     print(f'We have logged in as {client.user}')
+    print(checkMap)
+    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="for <help"))
 
 @client.event
 async def on_message(message):
+
+    users = checkMap.keys()
+
     if message.author == client.user:
         return
 
@@ -37,60 +39,145 @@ async def on_message(message):
             if repliedTo.reference is not None:  # is a reply to the origin image
                 originID = repliedTo.reference.message_id
                 origin = await message.channel.fetch_message(originID)
-                if checkList.__contains__(origin.author.id):
-                    if origin.author.id != repliedTo.author.id:
-                        await message.delete()
-                        await repliedTo.reply(':thumbsdown:')
+                if checkMap.keys.__contains__(origin.author.id):  # if source is on list
+                    if origin.author.id != repliedTo.author.id:  # if source is not requester
+                        for string in checkMap[origin.author.id]:
+                            if string == "all":  # if universal blacklist
+                                await message.delete()
+                                await repliedTo.reply(':thumbsdown:')
+                                return
+                            if repliedTo.content.contains(string):  # if blacklist includes used command
+                                await message.delete()
+                                await repliedTo.reply(':thumbsdown:')
+                                return
             else:  # look for origin image
-                # uhhh
-                #print(message.id)
                 async for checkMe in message.channel.history(limit=100):  # for every message in the past 100 messages
-                    #print(checkMe.author)
-                    #print(checkMe.id)
                     if checkMe.id != message.id:  # skip inciting message
-                        #print(checkMe.attachments)
-                        #print(checkMe.embeds)
-                        #print(checkMe.content)
                         if len(checkMe.attachments) != 0:  # message has attachments
                             for i in checkMe.attachments:
                                 if i.content_type.startswith("image"):  # message has an image
-                                    if checkList.__contains__(checkMe.author.id):
-                                        if checkMe.author.id != repliedTo.author.id:
-                                            await message.delete()
-                                            await repliedTo.reply(':thumbsdown:')
-                                    return
+                                    if checkMap.keys.__contains__(checkMe.author.id):  # is from a blocked user
+                                        for string in checkMap[checkMe.author.id]:
+                                            if string == "all":  # if universal blacklist
+                                                await message.delete()
+                                                await repliedTo.reply(':thumbsdown:')
+                                                return
+                                            if repliedTo.content.contains(string):  # if blacklist includes used command
+                                                await message.delete()
+                                                await repliedTo.reply(':thumbsdown:')
+                                                return
+                                    return  # source is safe
                         if len(checkMe.embeds) != 0:  # message has embeds
                             for i in checkMe.embeds:
-                                #print(i.type)
-                                if not embedList.__contains__(i.type):
-                                    if checkList.__contains__(checkMe.author.id):
-                                        if checkMe.author.id != repliedTo.author.id:
-                                            await message.delete()
-                                            await repliedTo.reply(':thumbsdown:')
-                            return
+                                if not embedList.__contains__(i.type):  # embed is 100% an image (rich moment, might get false positives)
+                                    if checkMap.keys.__contains__(checkMe.author.id):  # is from a blocked user
+                                        for string in checkMap[checkMe.author.id]:
+                                            if string == "all":  # if universal blacklist
+                                                await message.delete()
+                                                await repliedTo.reply(':thumbsdown:')
+                                                return
+                                            if repliedTo.content.contains(string):  # if blacklist includes used command
+                                                await message.delete()
+                                                await repliedTo.reply(':thumbsdown:')
+                                                return
+                                    return  # source(?) is safe
         return
 
-    # else
+    # bot commands
+    if message.content == "<help":
+        await message.reply("i hate you notsobot\n\nuse `<addme` to block notsobot commands\nuse `<removeme` to unblock notsobot commands\n\nwhen on list use `<blacklist` and `<unblacklist` to block/unblock specific notso commands\nif no blacklist is made all notsobot commands are blocked\nformat is `<blacklist magik`, with `magik` being replacable by any command (without prefix)\ncheck current blacklist with `<checklist`")
+        return
+
     if message.content == "<addme":
-        if checkList.__contains__(message.author.id):
+        if message.author.id in users:
             await message.reply('already in')
         else:
-            checkList.append(message.author.id)
+            checkMap[message.author.id] = ["all"]
             await message.reply('done')
-        newFile = open('listStore.csv', 'w', newline='\n')
-        newWrite = csv.writer(newFile)
-        newWrite.writerow(checkList)
+
+        json_object = json.dumps(checkMap, indent=4)
+        with open("mapStore.json", "w") as outfile:
+            outfile.write(json_object)
         return
 
     if message.content == "<removeme":
-        if checkList.__contains__(message.author.id):
-            checkList.remove(message.author.id)
+        if message.author.id in users:
+            del checkMap[message.author.id]
             await message.reply('done')
         else:
             await message.reply('not in list')
-        newFile = open('listStore.csv', 'w', newline='\n')
-        newWrite = csv.writer(newFile)
-        newWrite.writerow(checkList)
+
+        json_object = json.dumps(checkMap, indent=4)
+        with open("mapStore.json", "w") as outfile:
+            outfile.write(json_object)
         return
+
+    if message.content.startswith("<blacklist"):
+        parsed = message.content.split()
+        if len(parsed) != 2:
+            await message.reply("invalid number of arguments (only one word following command)")
+        elif parsed[1] == "all":
+            await message.reply("haha funny")
+        if message.author.id in users:
+            if checkMap[message.author.id] == ["all"]:
+                checkMap[message.author.id] = [parsed[1]]
+            else:
+                tempList = checkMap[message.author.id]
+                if parsed[1] in tempList:
+                    await message.reply("already blacklisted")
+                else:
+                    tempList.append(parsed[1])
+                    checkMap[message.author.id] = tempList
+                    await message.reply("done")
+
+            json_object = json.dumps(checkMap, indent=4)
+            with open("mapStore.json", "w") as outfile:
+                outfile.write(json_object)
+        else:
+            await message.reply("user does not have blacklist, to begin one use `<addme`")
+        return
+
+    if message.content.startswith("<unblacklist"):
+        parsed = message.content.split()
+        if len(parsed) != 2:
+            await message.reply("invalid number of arguments (only one word following command)")
+        elif parsed[1] == "all":
+            await message.reply("haha funny")
+        if message.author.id in users:
+            if checkMap[message.author.id] == ["all"]:
+                checkMap[message.author.id] = [parsed[1]]
+            else:
+                tempList = checkMap[message.author.id]
+                if parsed[1] in tempList:
+                    tempList.discard(parsed[1])
+                    if len(tempList) == 0:
+                        await message.reply("all blacklisted commands removed, universal blacklist applied. to instead have no blacklist, use `<removeme`")
+                        checkMap[message.author.id] = ["all"]
+                    else:
+                        checkMap[message.author.id] = tempList
+                        await message.reply("done")
+                else:
+                    await message.reply("command not in blacklist")
+
+            json_object = json.dumps(checkMap, indent=4)
+            with open("mapStore.json", "w") as outfile:
+                outfile.write(json_object)
+        else:
+            await message.reply("user does not have blacklist, to begin one use `<addme`")
+        return
+
+    if message.content == "<checklist":
+        if message.author.id in users:
+            if checkMap[message.author.id] == ["all"]:
+                await message.reply("universal blacklist")
+            else:
+                await message.reply(checkMap[message.author.id])
+        else:
+            await message.reply("user does not have blacklist, to begin one use `<addme`")
+        return
+
+    return
+
+
 
 client.run('')
