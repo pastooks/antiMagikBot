@@ -85,7 +85,7 @@ async def on_message(message):
 
     # bot commands
     if message.content == "<help":
-        await message.reply("i hate you notsobot\n\nuse `<addme` to block notsobot commands\nuse `<removeme` to unblock notsobot commands\n\nwhen on list use `<blacklist` and `<unblacklist` to block/unblock specific notso commands\nif no blacklist is made all notsobot commands are blocked\nformat is `<blacklist magik`, with `magik` being replacable by any command (without prefix)\ncheck current blacklist with `<checklist`")
+        await message.reply("i hate you notsobot\n\nuse `<addme` to block notsobot commands\nuse `<removeme` to unblock notsobot commands\n\nwhen on list use `<blacklist` and `<unblacklist` to block/unblock specific notso commands\nif no blacklist is made all notsobot commands are blocked\nformat is `<blacklist [command]`, with `[command]` being replacable by any command (without prefix)\ncheck current blacklist with `<checklist`")
         return
 
     if message.content == "<addme":
@@ -93,7 +93,7 @@ async def on_message(message):
             await message.reply('already in')
         else:
             checkMap[message.author.id] = ["all"]
-            await message.reply('done')
+            await message.reply('done, to customize blacklist use `<blacklist [command]`')
 
         json_object = json.dumps(checkMap, indent=4)
         with open("mapStore.json", "w") as outfile:
@@ -116,11 +116,18 @@ async def on_message(message):
         parsed = message.content.split()
         if len(parsed) != 2:
             await message.reply("invalid number of arguments (only one word following command)")
+            return
         elif parsed[1] == "all":
-            await message.reply("haha funny")
+            if checkMap[message.author.id] == ["all"]:
+                await message.reply("user already has universal blacklist")
+            else:
+                checkMap[message.author.id] = ["all"]
+                await message.reply("done, universal blacklist set")
+            return
         if message.author.id in users:
             if checkMap[message.author.id] == ["all"]:
                 checkMap[message.author.id] = [parsed[1]]
+                await message.reply("done, universal blacklist no longer applies")
             else:
                 tempList = checkMap[message.author.id]
                 if parsed[1] in tempList:
@@ -141,8 +148,10 @@ async def on_message(message):
         parsed = message.content.split()
         if len(parsed) != 2:
             await message.reply("invalid number of arguments (only one word following command)")
+            return
         elif parsed[1] == "all":
             await message.reply("haha funny")
+            return
         if message.author.id in users:
             if checkMap[message.author.id] == ["all"]:
                 checkMap[message.author.id] = [parsed[1]]
